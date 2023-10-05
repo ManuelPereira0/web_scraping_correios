@@ -19,10 +19,10 @@ def iniciar_driver():
     return driver
 
 conexao = pymysql.connect(
-    host='172.16.0.185',
-    user='manuel',
-    database='allcheck3',
-    password='manuel#allcheck2023',
+    host='your host',
+    user='your user',
+    database='your database',
+    password='your password',
     cursorclass=pymysql.cursors.DictCursor
 )
 
