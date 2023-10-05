@@ -12,27 +12,32 @@ import csv
 import re
 import pymysql.cursors
 
-# Configuração do logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Função para inicializar o driver
+def iniciar_driver():
+    driver = webdriver.Firefox()
+    driver.get("https://www2.correios.com.br/sistemas/precosprazos/restricaoentrega/")
+    return driver
 
 conexao = pymysql.connect(
-    host='your host',
-    user='your user',
-    database='your database',
-    password='your password',
+    host='172.16.0.185',
+    user='manuel',
+    database='allcheck3',
+    password='manuel#allcheck2023',
     cursorclass=pymysql.cursors.DictCursor
 )
 
 cursor = conexao.cursor()
 
-comando = f'select cep from cep_status WHERE status is null limit 500'
+comando = f'select cep from cep_status WHERE status is null'
 cursor.execute(comando)
 ceps = cursor.fetchall()
 
-# Configuração do driver do Selenium
-driver = webdriver.Firefox()
-driver.get("https://www2.correios.com.br/sistemas/precosprazos/restricaoentrega/")
+# Configuração do logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+contador_ceps = 0  # Inicialize o contador de CEPs processados
+driver = iniciar_driver()  # Inicialize o driver
 
 for cep in ceps:
     cep = cep['cep']
@@ -69,14 +74,24 @@ for cep in ceps:
     cursor.execute(atualizar)
     conexao.commit() 
 
+    contador_ceps += 1  # Incrementa o contador de CEPs processados
+
+    if contador_ceps == 5:  # Se 500 CEPs foram processados, reinicie o driver
+        driver.quit()  # Fecha o driver atual
+        contador_ceps = 0  # Reinicializa o contador
+        driver = iniciar_driver()  # Inicializa um novo driver
+    else:
+        try:
+            nova = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[2]/tbody/tr[6]/td/input')
+            nova.click()
+        except NoSuchElementException:
+            driver.refresh()
+            nova = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[2]/tbody/tr[6]/td/input')
+            nova.click()
+            
     sleep(1)
-
-    nova = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[2]/tbody/tr[6]/td/input')
-    nova.click()
-
-# Feche o navegador quando terminar
+# Feche o driver quando terminar
 driver.quit()
-
-# Feche o cursor e a conexão após o loop
 cursor.close()
 conexao.close()
+
