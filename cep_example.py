@@ -11,12 +11,22 @@ from selenium.common.exceptions import NoSuchElementException
 import csv
 import re
 import pymysql.cursors
+import datetime
 
 # Função para inicializar o driver
 def iniciar_driver():
     driver = webdriver.Firefox()
     driver.get("https://www2.correios.com.br/sistemas/precosprazos/restricaoentrega/")
     return driver
+
+# Função para recarregar o driver
+def recarregar_pagina(driver):
+    driver.refresh()
+    try:
+        alert = driver.switch_to.alert
+        alert.accept()
+    except:
+        pass
 
 conexao = pymysql.connect(
     host='your host',
@@ -32,6 +42,9 @@ comando = f'select cep from cep_status WHERE status is null'
 cursor.execute(comando)
 ceps = cursor.fetchall()
 
+contador = 112148
+contador_sessao = 0
+
 # Configuração do logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,8 +54,16 @@ driver = iniciar_driver()  # Inicialize o driver
 
 for cep in ceps:
     cep = cep['cep']
-    print(cep)
+
+    data_hora_atual = datetime.datetime.now()
+    data_hora_formada = data_hora_atual.strftime('%Y-%m-%d %H:%M:%S')
+
+    print(f'{cep} , {data_hora_formada} , Nº{contador} e Nº{contador_sessao}')
+    contador += 1
+    contador_sessao += 1
+
     sleep(1)
+    
     servico = Select(driver.find_element(By.XPATH, '//*[@id="servico"]'))
     servico.select_by_value('04510')
     
@@ -53,30 +74,41 @@ for cep in ceps:
     destino = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/div/div/form/span[3]/label/input')
     destino.clear()  # Limpe qualquer texto existente
     destino.send_keys(cep)
-    
+
     pesquisa = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/div/div/form/div[2]/button')
-    pesquisa.click()
+        
+    if pesquisa:
+        sleep(0.3)
+        pesquisa.click()
+    else:
+        driver.quit()  # Fecha o driver atual
+        driver = iniciar_driver()
     
     # Aguarde até que a mensagem de resultado seja exibida
     try:
-        msg = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[1]/tbody/tr/td/div/div')        
         sleep(0.5)
+        msg = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[1]/tbody/tr/td/div/div')        
 
     except NoSuchElementException:
-        msg = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/div/div')
         sleep(0.5)
+        msg = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/div/div')
     
+    except NoSuchElementException:
+        driver.quit()
+        driver = iniciar_driver()
+        
     except Exception as e:
         logger.error(f"Erro ao esperar pela mensagem de resultado: {e}")
         continue  # Pule para o próximo CEP se a mensagem não for encontrada
 
-    atualizar = f'UPDATE cep_status SET status = "{msg.text}" WHERE cep = "{cep}"'
+    msg = msg.text[:255]
+    atualizar = f'UPDATE cep_status SET status = "{msg}" WHERE cep = "{cep}"'
     cursor.execute(atualizar)
     conexao.commit() 
 
     contador_ceps += 1  # Incrementa o contador de CEPs processados
 
-    if contador_ceps == 5:  # Se 500 CEPs foram processados, reinicie o driver
+    if contador_ceps == 500:  # Se 500 CEPs foram processados, reinicie o driver
         driver.quit()  # Fecha o driver atual
         contador_ceps = 0  # Reinicializa o contador
         driver = iniciar_driver()  # Inicializa um novo driver
@@ -85,13 +117,15 @@ for cep in ceps:
             nova = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[2]/tbody/tr[6]/td/input')
             nova.click()
         except NoSuchElementException:
-            driver.refresh()
-            nova = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[2]/tbody/tr[6]/td/input')
-            nova.click()
-            
-    sleep(1)
+            driver.quit()  # Fecha o driver atual
+            driver = iniciar_driver()
+
+    if "This site can't be reached" in driver.page_source:
+        logger.info("A conexão com o site caiu. Recarregando a página.")
+        driver.quit()
+        driver = iniciar_driver()
+    
 # Feche o driver quando terminar
 driver.quit()
 cursor.close()
 conexao.close()
-
