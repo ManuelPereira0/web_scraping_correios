@@ -12,6 +12,7 @@ import csv
 import re
 import pymysql.cursors
 import datetime
+import sys
 
 # Função para inicializar o driver
 def iniciar_driver():
@@ -19,20 +20,11 @@ def iniciar_driver():
     driver.get("https://www2.correios.com.br/sistemas/precosprazos/restricaoentrega/")
     return driver
 
-# Função para recarregar o driver
-def recarregar_pagina(driver):
-    driver.refresh()
-    try:
-        alert = driver.switch_to.alert
-        alert.accept()
-    except:
-        pass
-
 conexao = pymysql.connect(
-    host='172.16.0.185',
-    user='manuel',
-    database='allcheck3',
-    password='manuel#allcheck2023',
+    host='your_host',
+    user='your_user',
+    database='your_database',
+    password='your_password',
     cursorclass=pymysql.cursors.DictCursor
 )
 
@@ -42,7 +34,7 @@ comando = f'select cep from cep_status WHERE status is null'
 cursor.execute(comando)
 ceps = cursor.fetchall()
 
-contador = 112148
+contador = 124942
 contador_sessao = 0
 
 # Configuração do logging
@@ -100,6 +92,13 @@ for cep in ceps:
             
         except Exception as e:
             logger.error(f"Erro ao esperar pela mensagem de resultado: {e}")
+            erro = str(sys.exc_info())  # Obtém a mensagem de erro atual
+            erro = erro[:255]  # Limita o comprimento da mensagem a 255 caracteres (como no seu código original)
+            
+            atualizar_erro = f'UPDATE cep_status SET status = "Erro com o CEP" WHERE cep = "{cep}"'
+            cursor.execute(atualizar_erro)
+            conexao.commit() 
+            
             continue  # Pule para o próximo CEP se a mensagem não for encontrada
 
         msg = msg.text[:255]
