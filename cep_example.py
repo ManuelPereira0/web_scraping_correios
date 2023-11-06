@@ -99,7 +99,6 @@ for cep_info in ceps:
             erro = str(e)
             erro = erro[55:]
             atualizar_status_no_banco(cep, erro, conexao, cursor)
-            logger.error(f"Erro ao processar o CEP {cep}: {erro}")
             continue    
 
         msg_text = msg.text[:255]
