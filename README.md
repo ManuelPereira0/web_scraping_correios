@@ -30,5 +30,5 @@ Para fazer a instalação da versão mais recente do Python no Windows: https://
 - pip install bs4 
 
 ### Para rodar o programa
-> No Linux: python3 nome_do_programa <br>
-> No Windows: python nome_do_programa
+> No Linux: python3 nome_do_arquivo.py <br>
+> No Windows: python nome_do_arquivo.py
