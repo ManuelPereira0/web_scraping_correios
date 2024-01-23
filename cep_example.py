@@ -1,10 +1,8 @@
 import logging
-from bs4 import BeautifulSoup
 from time import sleep
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait, Select
-from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
 import pymysql.cursors
 import datetime
@@ -18,10 +16,10 @@ def iniciar_driver():
 # Função para criar uma conexão com o banco de dados
 def criar_conexao():
     return pymysql.connect(
-        host='your_host',
-        user='your_user',
-        database='your_database',
-        password='your_password',
+        host='172.16.0.185',
+        user='manuel',
+        database='allcheck3',
+        password='manuel#allcheck2023',
         cursorclass=pymysql.cursors.DictCursor
     )
 
@@ -29,11 +27,13 @@ def criar_conexao():
 def atualizar_status_no_banco(cep, status, conexao, cursor):
     try:
         status = status[:255]
-        comando = f'UPDATE cep_status SET status = %s WHERE cep = %s'
+        comando = f'UPDATE (nome do seu DB) SET status = %s WHERE cep = %s'
         cursor.execute(comando, (status, cep))
         conexao.commit()
     except Exception as e:
         logger.error(f"Erro ao atualizar status no banco de dados para o CEP {cep}: {str(e)}")
+        driver.quit()
+        driver = iniciar_driver()
 
 # Configuração do logging
 logging.basicConfig(level=logging.INFO)
@@ -43,11 +43,11 @@ logger = logging.getLogger(__name__)
 conexao = criar_conexao()
 cursor = conexao.cursor()
 
-comando = f'SELECT cep FROM cep_status WHERE status IS NULL'
+comando = f'SELECT cep FROM (nome do seu DB) WHERE status IS NULL'
 cursor.execute(comando)
 ceps = cursor.fetchall()
 
-contador = 676673
+contador = 22254
 contador_sessao = 1
 
 contador_ceps = 0  # Inicialize o contador de CEPs processados
@@ -89,16 +89,20 @@ for cep_info in ceps:
         # Aguarde até que a mensagem de resultado seja exibida
         try:
             sleep(0.5)
-            msg = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div/2/div/div/div[2]/div[2]/div[2]/table[1]/tbody/tr/td/div/div')
+            msg = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/div/div')
         
         except NoSuchElementException:
             sleep(0.5)
-            msg = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div/2/div/div/div[2]/div[2]/div[2]/div/div')
+            msg = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[1]/tbody/tr/td/div/div')
         
         except Exception as e:
             erro = str(e)
             erro = erro[55:]
             atualizar_status_no_banco(cep, erro, conexao, cursor)
+            logger.error(f"Problema com o CEP {cep}")
+            driver.quit()
+            print("...................................")
+            driver = iniciar_driver()   
             continue    
 
         msg_text = msg.text[:255]
@@ -112,7 +116,7 @@ for cep_info in ceps:
             driver = iniciar_driver()  # Inicializa um novo driver
         else:
             try:
-                nova = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div/2/div/div/div[2]/div[2]/div[2]/table[2]/tbody/tr[6]/td/input')
+                nova = driver.find_element(By.XPATH, '/html/body/div[1]/div[3]/div[2]/div/div/div[2]/div[2]/div[2]/table[2]/tbody/tr[6]/td/input')
                 nova.click()
             except NoSuchElementException:
                 driver.quit()  # Fecha o driver atual
@@ -125,6 +129,8 @@ for cep_info in ceps:
 
     except Exception as e:
         logger.error(f"Erro ao processar o CEP {cep}: {str(e)}")
+        driver.quit()
+        driver = iniciar_driver()
 
 # Feche o driver quando terminar
 driver.quit()
